@@ -51,13 +51,15 @@
 #   - t_TU      = Solution vector of times [Nondimensional time units of CRTBP]
 #   - dV1       = Initial guess of initial impulsive maneuver
 #   - dV2       = Initial guess of final impulsive maneuver
-#   - defect    = Differential defects at solution. 
+#   - defect    = Differential defects at solution.
 
 
 
 function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU, TU, n_nodes,
     nsteps, mass, Isp, X0_times, X0_states, Xf_times, Xf_states, plot_yn,
     flagEnd, β, allowImpulsive, maxIter)
+
+    global day
 
     ## DEFINE SUB-FUNCTIONS
 
@@ -247,6 +249,8 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         nstate, n_nodes, X0_times, X0_states, Xf_times, Xf_states, flagEnd, β)
         #Optimizes 1 iteration of the QP/SOCP problem.
 
+        # global day
+
         #JuMP linear/quadratic constrained solver
         #
         #See link for more solvers:
@@ -425,45 +429,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         alpha = alpha[1]
     end
 
-    function plotTrajPlotly(X_all, u_all, X0_states, Xf_states, u_scale)
-        #Plot trajectory with PlotlyJS package
 
-        Plots.plot(X0_states[1,:], X0_states[2,:], X0_states[3,:], w=3,
-            xlabel="X (DU)", ylabel="Y (DU)", zlabel="Z (DU)",
-            label="X₀")
-        Plots.plot!(Xf_states[1,:], Xf_states[2,:], Xf_states[3,:], w=2, label="Xf")
-        Plots.plot!([1-MU], [0.], [0.], m=(0,2,:black) , label="Moon")
-        Plots.plot!(X_all[1,:],X_all[2,:],X_all[3,:], w=3, color=:black, label="Transfer trajectory")
-
-        arrows_start = X_all[1:3,:]
-        arrows_end = X_all[1:3,:] + u_all*u_scale
-
-        #remove zero thrust vectors:
-        arrows_start = arrows_start[:, norm_many(u_all) .!== 0.]
-        arrows_end   = arrows_end[:, norm_many(u_all) .!== 0.]
-
-        arrows_x = vcat(arrows_start[1,:]', arrows_end[1,:]')
-        arrows_y = vcat(arrows_start[2,:]', arrows_end[2,:]')
-        arrows_z = vcat(arrows_start[3,:]', arrows_end[3,:]')
-
-        plot!([1-MU,], [0,], [0.2,], marker=1, color=:white)
-
-        Plots.plot!(arrows_x, arrows_y, arrows_z, color=:red, show=true)
-
-
-
-        #create data points for a sphere surface:
-        (x,y,z) = sphere(32)
-
-        #scale and move the sphere:
-        r_moon = 1737. #km
-        x = (x * r_moon/DU) + (1-MU)
-        y = y * r_moon/DU
-        z = z * r_moon/DU
-
-        #plot the sphere as a surface:
-        Plots.surface!(x,y,z, c=:blues)
-    end
 
     function interpEndStates(τ1, τ2, X0_times, X0_states, Xf_times, Xf_states, MU)
         #Interpolate the initial and final states from the given set of states
@@ -608,18 +574,8 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
             #Can plot either with Julia (slow) or with MATLAB (less slow)
 
             #Plot with Julia:
-            plotTrajPlotly(X_all, u_all, X0_states, Xf_states, 0.2)
+            plotTrajPlotly_direct(X_all, zeros(size(u_all)), X0_states, Xf_states, 0.2)
             gui()
-
-            # #Plot with MATLAB:
-            # plotTrajMATLAB(X_all, u_all, X0_states, Xf_states)
-            # mat"""
-            #     figure(99)
-            #     plot3($x1_1(1,:), $x1_1(2,:), $x1_1(3,:),'k--')
-            #     plot3($x2_1(1,:), $x2_1(2,:), $x2_1(3,:),'k--')
-            #     plot3($x1_2(1,:), $x1_2(2,:), $x1_2(3,:),'b--')
-            #     plot3($x2_2(1,:), $x2_2(2,:), $x2_2(3,:),'r--')
-            # """
         end
 
 
@@ -636,45 +592,6 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
     #outputs:
     (X_all, u_all, τ1, τ2, t_TU, dV1, dV2, defect)
 end
-
-
-# function plotTrajMATLAB(X_all, u_all, X0_states, Xf_states)
-#     #Plot with MATLAB
-#     dV0 = zeros(3)
-#     dVf = zeros(3)
-#     mat"""
-#
-#         figure(99)
-#         %figure
-#         clf
-#         hold all
-#
-#         plot3($X0_states(1,:), $X0_states(2,:), $X0_states(3,:))
-#         view(3)
-#         plot3($Xf_states(1,:), $Xf_states(2,:), $Xf_states(3,:))
-#         plot3($X_all(1,:),$X_all(2,:),$X_all(3,:),'k')
-#         quiver3($X_all(1,:),$X_all(2,:),$X_all(3,:), $u_all(1,:),$u_all(2,:),$u_all(3,:),1.0,'m')
-#         quiver3($X_all(1,1),$X_all(2,1),$X_all(3,1), $dV0(1),$dV0(2),$dV0(3), 0.01,'r','linewidth',2)
-#         quiver3($X_all(1,end),$X_all(2,end),$X_all(3,end), $dVf(1),$dVf(2),$dVf(3), 0.01,'r','linewidth',2)
-#         axis equal
-#         axis tight
-#
-#         title('Earth-Moon rotating frame')
-#         xlabel('X (DU)')
-#         ylabel('Y (DU)')
-#         zlabel('Z (DU)')
-#         view(3)
-#
-#         [x2,y2,z2] = sphere(20);
-#         moon_scale = $r_moon/$DU;
-#         x2 = moon_scale*x2 + (1- $MU); y2 = moon_scale*y2; z2 = moon_scale*z2;
-#         moon = surf(x2,y2,z2);
-#         set(moon,'FaceColor',[.5,.5,0.5],'FaceAlpha',0.7,'EdgeAlpha',0.5)
-#         rotate3d('on')
-#         drawnow
-#
-#     """
-# end
 
 
 function meshRefine_direct(X_all, u_all, t_TU, nstate, n_nodes, nsteps, Isp, odefun)
@@ -760,4 +677,44 @@ function meshRefine_direct(X_all, u_all, t_TU, nstate, n_nodes, nsteps, Isp, ode
 
     #outputs:
     (X_all, u_all, t_TU, n_nodes)
+end
+
+function plotTrajPlotly_direct(X_all, u_all, X0_states, Xf_states, u_scale)
+    #Plot trajectory with PlotlyJS package
+
+    Plots.plot(X0_states[1,:], X0_states[2,:], X0_states[3,:], w=3,
+        xlabel="X (DU)", ylabel="Y (DU)", zlabel="Z (DU)",
+        label="X₀")
+    Plots.plot!(Xf_states[1,:], Xf_states[2,:], Xf_states[3,:], w=2, label="Xf")
+    Plots.plot!([1-MU], [0.], [0.], m=(0,2,:black) , label="Moon")
+    Plots.plot!(X_all[1,:],X_all[2,:],X_all[3,:], w=3, color=:black, label="Transfer trajectory")
+
+    arrows_start = X_all[1:3,:]
+    arrows_end = X_all[1:3,:] + u_all*u_scale
+
+    #remove zero thrust vectors:
+    arrows_start = arrows_start[:, norm_many(u_all) .!== 0.]
+    arrows_end   = arrows_end[:, norm_many(u_all) .!== 0.]
+
+    arrows_x = vcat(arrows_start[1,:]', arrows_end[1,:]')
+    arrows_y = vcat(arrows_start[2,:]', arrows_end[2,:]')
+    arrows_z = vcat(arrows_start[3,:]', arrows_end[3,:]')
+
+    plot!([1-MU,], [0,], [0.2,], marker=1, color=:white)
+
+    Plots.plot!(arrows_x, arrows_y, arrows_z, color=:red, show=true)
+
+
+
+    #create data points for a sphere surface:
+    (x,y,z) = sphere(32)
+
+    #scale and move the sphere:
+    r_moon = 1737. #km
+    x = (x * r_moon/DU) + (1-MU)
+    y = y * r_moon/DU
+    z = z * r_moon/DU
+
+    #plot the sphere as a surface:
+    Plots.surface!(x,y,z, c=:blues)
 end

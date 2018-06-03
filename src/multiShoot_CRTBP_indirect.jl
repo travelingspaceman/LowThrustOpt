@@ -54,7 +54,7 @@
 
 
 
-function multishoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
+function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
     mass0, thrustLimit, plot_yn, flag_adjointsOnly, maxIter, p, rho)
 
     ## DEFINE SUB-FUNCTIONS
@@ -305,18 +305,17 @@ function multishoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
 
         ############ PLOT UPDATE
         if plot_yn
-
-            #
             (XC_dense, t_dense) = densify(XC_all, t_TU, params, 100)
 
             #compute control, or just use zeros (plotting is faster when not
             #drawing control arrows)
             u_all = zeros(3, size(XC_dense,2))
             # for ind = 1:size(XC_dense,2)
-            #     u_all[:,ind] = controlLaw_cart(XC_dense[nstate+4:nstate+6,ind], thrustLimit, p, rho)
+            #     u_all[:,ind] = controlLaw_cart(XC_dense[nstate+4:nstate+6,ind], thrustLimit, p, rho, mass0)
             # end
 
-            plotTrajPlotly(XC_dense, u_all, X0_states, Xf_states, 0.2)
+            plotlyjs(legend=false)
+            plotTrajPlotly_indirect(XC_dense, u_all, X0_states, Xf_states, 0.2)
             gui()
         end
 
@@ -386,7 +385,7 @@ function plotTrajPlotly_indirect(XC_all, u_all, X0_states, Xf_states, u_scale)
 end
 
 
-function controlLaw_cart(lambda_v, thrustLimit, p, rho)
+function controlLaw_cart(lambda_v, thrustLimit, p, rho, mass)
     #Calculate control (only used for plotting)
 
     #Control law for indirect multiple shooting (compute the control as a function
@@ -414,16 +413,16 @@ function controlLaw_cart(lambda_v, thrustLimit, p, rho)
     if p == 0
       #Force thrust to always be on, in the optimal direction. This limits how big
       #of a search we need to make for the neural net stuff.
-      umag = accelLimit #N
+      umag = accelLimit #DU/TU^2
 
     elseif p == 1 #minimum mass problem
-        umag = 1/2 * (1 + tanh( (lambda_v_mag - 1) / (2*rho) )) * accelLimit
+        umag = 1/2 * (1 + tanh( (lambda_v_mag - 1) / (2*rho) )) * accelLimit #DU/TU^2
 
     elseif p > 1 #p is in the range (1, 2]
-        umag = (1/p * norm(lambda_v))^(1 / (p-1));
+        umag = (1/p * norm(lambda_v))^(1 / (p-1)) #DU/TU^2
 
         if umag > accelLimit
-          umag = accelLimit
+          umag = accelLimit #DU/TU^2
         end
     else
       error("Invalid value of p!")
@@ -436,14 +435,5 @@ function controlLaw_cart(lambda_v, thrustLimit, p, rho)
     #units of umag are acceleration (DU/TU^2)
 
     #Control vector, scaled properly:
-    # control = -umag * lambda_v ./ norm(lambda_v) / mass / 1e3 * TU^2 / DU #(kg*m/s^2) -> (km/s^2) -> (DU/TU^2) acceleration
-
-
     control = -umag * lambda_v ./ norm(lambda_v) * mass * DU * 1e3 / TU^2 #(DU/TU^2) -> (km/s^2) -> (kg*m/s^2) force
-
-
-
-
-    #Outputs:
-    # control = uhat .* umag #3-vector
 end

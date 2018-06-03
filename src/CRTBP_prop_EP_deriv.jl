@@ -1,4 +1,7 @@
-#Nathan Parrish 2015
+#Copyright Nathan Parrish 2018
+#University of Colorado, Boulder
+#Colorado Center for Astrodynamics Research
+#Celestial and Spaceflight Mechanics Laboratory
 #
 #CRTBP propagator, with thrust given
 
