@@ -1,0 +1,24 @@
+-CHANGE LOG
+
+MULTISHOOT DIRECT
+- Linspace to LinRange
+- control[:]=0 to control[i] = 0
+
+- tau = (t_TU - t0_TU) / (tf_TU - t0_TU) * 2 - 1 to tau = (t_TU .- t0_TU) ./ (tf_TU .- t0_TU) .* 2 .- 1
+
+- t_TU_mod1 = t0_TU + (tau+1)/2*(tf_TU_mod1-t0_TU) to  t_TU_mod1 = t0_TU + (tau.+1)./2.*(tf_TU_mod1-t0_TU)
+
+
+- t_TU_fixed = t0_TU + (tau+1)/2 *(tf_TU-t0_TU) to t_TU_fixed = t0_TU .+ (tau.+1)./2 .*(tf_TU-t0_TU)
+
+- Model(solver = Ipopt) to Model(Ipopt.Optimizer)
+
+- solve(m) to optimize!(m)
+
+
+MULTISHOOT INDIRECT
+- tau = (t_TU - t0_TU) / (tf_TU - t0_TU) * 2 - 1 to tau = (t_TU .- t0_TU) ./ (tf_TU - t0_TU) .* 2 .- 1
+- eye() to I()
+- temp[idx] = false to  temp[idx] .= false
+- idx += 2*nstate to idx .+= 2*nstate
+- sparse to MATLAB.sparse
