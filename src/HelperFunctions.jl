@@ -36,7 +36,7 @@ end
 
 #finds the value of τ that matches the X_states most closely to a new endpoint
 function find_τ(X_times, X_states, state, MU)
-    τ_trial = linspace(0, 1, 1001)
+    τ_trial = LinRange(0, 1, 1001)
     d = zeros(length(τ_trial))
     for ind = 1:length(τ_trial)
         state_trial = interpInitialStates(τ_trial[ind], X_times, X_states, MU)
@@ -52,7 +52,7 @@ function densify(XC_all, t_TU, params, n_desired)
 
     XC_dense = zeros(size(XC_all,1), 0)
     t_dense_db = zeros(0)
-    t_dense = linspace(t_TU[1], t_TU[end], n_desired)
+    t_dense = LinRange(t_TU[1], t_TU[end], n_desired)
     for ind = 1:(size(XC_all, 2)-1)
 
         # t_save = linspace(t_TU[ind], t_TU[ind+1],

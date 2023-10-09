@@ -81,7 +81,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
             ########### propagate forward:
             x0 = copy(X_all[:,i])
             control = copy(u_all[:,i])
-            tspan = linspace(t_TU[i], t_mid_TU[i], nsteps)
+            tspan = LinRange(t_TU[i], t_mid_TU[i], nsteps)
             time_direction = 1.0 #forward
             (state_for, maxErr_for) = ode7_8(odefun, tspan, x0, MU, DU, TU, Isp, control, time_direction)
 
@@ -261,10 +261,10 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         #has suffered frequently from bugs when updating Julia.
         #
         # m = Model(solver=GurobiSolver(BarConvTol=1e-10, OutputFlag=0))
-        m = Model(solver=IpoptSolver(print_level=0))
+        m = Model(Ipopt.Optimizer)
 
         #State update variables:
-        @variable(m,    X_jump[1:length(X_all)] )
+        @variable(m,X_jump[1:length(X_all)] )
         #constrain initial mass:
         if nstate == 7
             @constraint(m, (X_jump[7] + X_all[7, 1]) == mass)
@@ -272,7 +272,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
 
         #control update variables:
         #limits on u_jump have to be determined by u_all
-        @variable(m, u_jump[1:length(u_all)])
+        @variable(m,u_jump[1:length(u_all)])
 
         #endpoint parameter variables:
         if flagEnd
@@ -320,7 +320,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         #Need 'dt' so that unequal time steps gives the right result. If we
         #don't use 'dt' like this, then high thrust for a long segment is
         #weighted equally with high thrust for a short segment.
-        t_TU_fixed = t0_TU + (tau+1)/2*(tf_TU-t0_TU) #transform tau -> t
+        t_TU_fixed = t0_TU .+ (tau.+1)./2 .*(tf_TU-t0_TU) #transform tau -> t
         dt = diff(t_TU_fixed)
         dt_temp = vcat(dt/2, dt[end]/2) + vcat(0, dt[1:end-1]/2, 0)
         dt_repeated = ones(3,1) * dt_temp' #same size as control
@@ -383,23 +383,23 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         @objective(m, Min, cost)
 
         #Run QP solver:
-        status = JuMP.solve(m)
+        optimize!(m)
 
-        x_update = reshape(getvalue(X_jump), nstate, n_nodes)
-        u_update = reshape(getvalue(u_jump), 3, n_nodes)
+        x_update = reshape(JuMP.value.(X_jump), nstate, n_nodes)
+        u_update = reshape(JuMP.value.(u_jump), 3, n_nodes)
 
-        p1_update = getvalue(p1_jump)
-        p2_update = getvalue(p2_jump)
-        tf_update = getvalue(tf_jump)
-        dV1_update = getvalue(dV1_jump)
-        dV2_update = getvalue(dV2_jump)
+        p1_update = JuMP.value.(p1_jump)
+        p2_update = JuMP.value.(p2_jump)
+        tf_update = JuMP.value.(tf_jump)
+        dV1_update = JuMP.value.(dV1_jump)
+        dV2_update = JuMP.value.(dV2_jump)
 
-        tf_TU = tf_TU + getvalue(tf_jump)
+        tf_TU = tf_TU + JuMP.value.(tf_jump)
 
-        cost = getvalue(cost)
+        cost = JuMP.value.(cost)
 
         #Outputs:
-        (x_update, u_update, p1_update, p2_update, tf_update, dV1_update, dV2_update, status, cost, dstate0_dp1, dstatef_dp2, ddstate0_dp1, ddstatef_dp2)
+        (x_update, u_update, p1_update, p2_update, tf_update, dV1_update, dV2_update, cost, dstate0_dp1, dstatef_dp2, ddstate0_dp1, ddstatef_dp2)
     end
 
     function lineSearch(X_all, x_update, u_all, u_update, t_TU, nstate, n_nodes, nsteps, Isp, odefun)
@@ -408,7 +408,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
 
         alpha = 1.0
 
-        alpha_all = linspace(0.1, 1, 10)
+        alpha_all = LinRange(0.1, 1, 10)
 
         er = zeros(size(alpha_all))
 
@@ -478,7 +478,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
 
     t0_TU = copy(t_TU[1])
     tf_TU = copy(t_TU[end])
-    tau = (t_TU - t0_TU) / (tf_TU - t0_TU) * 2 - 1; #transform t -> tau
+    tau = (t_TU .- t0_TU) ./ (tf_TU .- t0_TU) .* 2 .- 1; #transform t -> tau
 
     (state_0, state_f) = interpEndStates(τ1, τ2, X0_times, X0_states, Xf_times, Xf_states, MU)
 
@@ -491,7 +491,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
     while er > 1e-6
         iterCount += 1
         if iterCount > maxIter
-            warn("Reached max iteration count at ", iterCount," iterations")
+            print("Reached max iteration count at ", iterCount," iterations")
             break
         end
 
@@ -506,8 +506,8 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         tf_TU = copy(t_TU[end])
         tf_TU_mod1 = tf_TU + pert_tf
         tf_TU_mod2 = tf_TU - pert_tf
-        t_TU_mod1 = t0_TU + (tau+1)/2*(tf_TU_mod1-t0_TU) #transform tau -> t
-        t_TU_mod2 = t0_TU + (tau+1)/2*(tf_TU_mod2-t0_TU) #transform tau -> t
+        t_TU_mod1 = t0_TU .+ (tau.+1)./2 .*(tf_TU_mod1-t0_TU) #transform tau -> t
+        t_TU_mod2 = t0_TU .+ (tau.+1)./2 .*(tf_TU_mod2-t0_TU) #transform tau -> t
         (defect_mod1, errors) = defectCalc(X_all, u_all, t_TU_mod1, nstate, n_nodes, nsteps, Isp, odefun)
         (defect_mod2, errors) = defectCalc(X_all, u_all, t_TU_mod2, nstate, n_nodes, nsteps, Isp, odefun)
 
@@ -526,7 +526,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         end
 
         (x_update, u_update, p1_update, p2_update, tf_update, dV1_update, dV2_update,
-            status, cost, dstate0_dp1, dstatef_dp2, ddstate0_dp1, ddstatef_dp2) =
+             cost, dstate0_dp1, dstatef_dp2, ddstate0_dp1, ddstatef_dp2) =
             optimizeTraj(X_all, u_all, τ1, τ2, tf_TU, tau, dV1, dV2, defect, Jac_full,
             nstate, n_nodes, X0_times, X0_states, Xf_times, Xf_states, flagEnd_temp, β)
 
@@ -540,7 +540,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         x2_1 = zeros(6, num_test)
         x1_2 = zeros(6, num_test)
         x2_2 = zeros(6, num_test)
-        temp = linspace(-1, 1, num_test)
+        temp = LinRange(-1, 1, num_test)
         for ind = 1:num_test
             #linear:
             x1_1[:,ind] = (state_0 + dstate0_dp1*(p1_update)*temp[ind])
@@ -579,7 +579,7 @@ function multiShoot_CRTBP_direct(X_all, u_all, τ1, τ2, t_TU, dV1, dV2, MU, DU,
         end
 
 
-        t_TU = t0_TU + (tau+1)/2*(tf_TU-t0_TU) #transform tau -> t
+        t_TU = t0_TU .+ (tau.+1)./2 .*(tf_TU-t0_TU) #transform tau -> t
 
         ############ CHECK UPDATE
         (defect, errors) = defectCalc(X_all, u_all, t_TU, nstate, n_nodes, nsteps, Isp, odefun)
@@ -700,7 +700,6 @@ function plotTrajPlotly_direct(X_all, u_all, X0_states, Xf_states, u_scale)
     arrows_y = vcat(arrows_start[2,:]', arrows_end[2,:]')
     arrows_z = vcat(arrows_start[3,:]', arrows_end[3,:]')
 
-    plot!([1-MU,], [0,], [0.2,], marker=1, color=:white)
 
     Plots.plot!(arrows_x, arrows_y, arrows_z, color=:red, show=true)
 
@@ -711,9 +710,9 @@ function plotTrajPlotly_direct(X_all, u_all, X0_states, Xf_states, u_scale)
 
     #scale and move the sphere:
     r_moon = 1737. #km
-    x = (x * r_moon/DU) + (1-MU)
-    y = y * r_moon/DU
-    z = z * r_moon/DU
+    x = (x .* r_moon./DU) .+ (1-MU)
+    y = y .* r_moon./DU
+    z = z .* r_moon./DU
 
     #plot the sphere as a surface:
     Plots.surface!(x,y,z, c=:blues)

@@ -52,6 +52,7 @@
 #                 0 for successful convergence.
 #                 1 for failure.
 
+using Printf
 
 
 function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
@@ -119,7 +120,7 @@ function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
             #automatic differentiation with dual numbers:
             Jac_AD_ForwardDiff_prop = ForwardDiff.jacobian(f,x0)
 
-            Jac_temp[(i-1)*nstate*2 + 1 : i*nstate*2, :] = hcat(Jac_AD_ForwardDiff_prop, -eye(nstate*2))
+            Jac_temp[(i-1)*nstate*2 + 1 : i*nstate*2, :] = hcat(Jac_AD_ForwardDiff_prop, -1 .* I(nstate*2))
         end
 
 
@@ -137,8 +138,8 @@ function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
         end
 
         #Remove the first and last states:
-        Jac_full[:, 1:nstate] = 0.
-        Jac_full[:, (end-2*nstate+1):(end-nstate)] = 0.
+        Jac_full[:, 1:nstate] .= 0
+        Jac_full[:, (end-2*nstate+1):(end-nstate)] .= 0
 
         #outputs:
         Jac_full
@@ -169,15 +170,15 @@ function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
             #Remove the columns of Jac_full corresponding to the all states
             idx = 1:nstate
             for ind = 1:(n_nodes-1)
-                temp[idx] = false
-                idx += 2*nstate
+                temp[idx] .= false
+                idx = idx .+ (2*nstate)
             end
 
             Jac_full = Jac_full[:, temp]
         end
 
         #output:
-        Jac_sparse = sparse(Jac_full) #create sparse Jacobian (~2-3 ms)
+        Jac_sparse = MATLAB.sparse(Jac_full) #create sparse Jacobian (~2-3 ms)
         xc_update = -Jac_sparse \ defect_vec #sparse matrix pseudo-inverse
         xc_update2 = zeros(size(temp))
         xc_update2[temp] = xc_update
@@ -223,7 +224,7 @@ function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
 
         alpha = 1.0
 
-        alpha_all = linspace(0.1, 1, 20)
+        alpha_all = LinRange(0.1, 1, 20)
 
         er = zeros(size(alpha_all))
         cost = zeros(size(alpha_all))
@@ -264,7 +265,7 @@ function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
 
     t0_TU = copy(t_TU[1])
     tf_TU = copy(t_TU[end])
-    tau = (t_TU - t0_TU) / (tf_TU - t0_TU) * 2 - 1; #transform t -> tau
+    tau = (t_TU .- t0_TU) ./ (tf_TU - t0_TU) .* 2 .- 1 #transform t -> tau
 
     state_0 = XC_all[1:nstate, 1]
     state_f = XC_all[1:nstate, end]
@@ -279,7 +280,7 @@ function multiShoot_CRTBP_indirect(XC_all, t_TU, MU, DU, TU, n_nodes,
     while er > 1e-10
         iterCount += 1
         if iterCount > maxIter
-            warn("Reached max iteration count at ", iterCount," iterations")
+            print("Reached max iteration count at ", iterCount," iterations")
             status_flag = 1
             break
         end
@@ -375,12 +376,12 @@ function plotTrajPlotly_indirect(XC_all, u_all, X0_states, Xf_states, u_scale)
 
     #scale and move the sphere:
     r_moon = 1737. #km
-    x = (x * r_moon/DU) + (1-MU)
-    y = y * r_moon/DU
-    z = z * r_moon/DU
+    x = (x .* r_moon ./ DU) .+ (1-MU)
+    y = y .* r_moon./DU
+    z = z .* r_moon./DU
 
     #plot the sphere as a surface:
-    clibrary(:cmocean)
+    #clibrary(:cmocean)
     Plots.surface!(x,y,z, c=:gray)
 end
 

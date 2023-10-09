@@ -57,7 +57,10 @@ function CRTBP_stateCostate_deriv!(dstate_costate, statesCostates, params, t)
   control_accel = -umag * λv ./ norm(λv) #DU/TU^2
 
   if isnan(control_accel[1])
-      control_accel[:] = 0.
+    for i = 1:length(control_accel)
+      control_accel[i] = 0.
+    end 
+    
   end
 
 
